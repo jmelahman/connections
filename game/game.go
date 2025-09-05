@@ -390,7 +390,11 @@ func Run(app *tview.Application) error {
 	grid.AddItem(deselectButton, 4, 3, 1, 1, 0, 0, false)
 
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		previousButton := findButton(focusedRow, focusedCol).SetActivatedStyle(defaultStyle)
+		previousButton := findButton(focusedRow, focusedCol)
+		if focusedRow < 4 {
+			previousButton.SetBorderColor(tcell.ColorDarkGray)
+		}
+		previousButton.SetActivatedStyle(defaultStyle)
 		if focusedRow < 4 && gameState.selectedCards[previousButton.GetLabel()] {
 			previousButton.SetStyle(selectedStyle)
 		} else if focusedRow == 4 {
@@ -479,11 +483,15 @@ func Run(app *tview.Application) error {
 		if gameState.selectedCards[button.GetLabel()] {
 			button.SetActivatedStyle(selectedStyle)
 		}
+		if focusedRow < 4 {
+			button.SetBorderColor(tcell.ColorGray)
+		}
 		app.SetFocus(button)
 		return nil
 	})
 
 	app.SetFocus(buttons[0][0])
+	buttons[0][0].SetBorderColor(tcell.ColorGray)
 
 	// Create a flexbox to center the grid horizontally.
 	flex := tview.NewFlex().
