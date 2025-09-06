@@ -172,11 +172,6 @@ func Run(app *tview.Application) error {
 		submitButton.SetLabel("Submit (s)")
 	}
 
-	setFocus := func(r, c int) {
-		focusedRow = r
-		focusedCol = c
-	}
-
 	findButton := func(r, c int) *tview.Button {
 		if r == 4 {
 			switch c {
@@ -189,6 +184,21 @@ func Run(app *tview.Application) error {
 			}
 		}
 		return buttons[r][c]
+	}
+
+	setFocus := func(r, c int) {
+		// Unset previous button's border.
+		if focusedRow < 4 {
+			findButton(focusedRow, focusedCol).SetBorderColor(tcell.ColorDarkGray)
+		}
+		focusedRow = r
+		focusedCol = c
+		// Set current button's border.
+		button := findButton(focusedRow, focusedCol)
+		if focusedRow < 4 {
+			button.SetBorderColor(tcell.ColorGray)
+		}
+		app.SetFocus(button)
 	}
 
 	handleClick := func(r, c int) func() {
@@ -391,6 +401,7 @@ func Run(app *tview.Application) error {
 
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		previousButton := findButton(focusedRow, focusedCol)
+		// TODO: This is currently duplicated with behavior in setFocus to support clicking.
 		if focusedRow < 4 {
 			previousButton.SetBorderColor(tcell.ColorDarkGray)
 		}
@@ -483,15 +494,11 @@ func Run(app *tview.Application) error {
 		if gameState.selectedCards[button.GetLabel()] {
 			button.SetActivatedStyle(selectedStyle)
 		}
-		if focusedRow < 4 {
-			button.SetBorderColor(tcell.ColorGray)
-		}
-		app.SetFocus(button)
+		setFocus(focusedRow, focusedCol)
 		return nil
 	})
 
-	app.SetFocus(buttons[0][0])
-	buttons[0][0].SetBorderColor(tcell.ColorGray)
+	setFocus(0, 0)
 
 	// Create a flexbox to center the grid horizontally.
 	flex := tview.NewFlex().
