@@ -155,19 +155,18 @@ func Run(app *tview.Application) error {
 
 	baseStyle := tcell.StyleDefault.
 		Background(tcell.ColorDefault).
-		Foreground(tcell.ColorBlack.TrueColor()).
-		Bold(true)
-	defaultStyle := baseStyle.Foreground(tcell.ColorDefault)
-	selectedStyle := baseStyle.Foreground(tcell.ColorGray)
-	selectedActivatedStyle := baseStyle.Foreground(tcell.ColorLightGray)
+		Foreground(tcell.ColorBlack.TrueColor())
+	defaultStyle := baseStyle.Foreground(tcell.ColorDefault).Bold(true)
+	selectedStyle := baseStyle.Foreground(tcell.ColorGray).Bold(false)
+	disabledStyle := baseStyle.Foreground(tcell.ColorLightGray).Bold(false)
 
 	var shuffleButton, submitButton, deselectButton *tview.Button
 
 	resetSubmitButton := func() {
 		if len(gameState.selectedCards) != 4 {
-			submitButton.SetStyle(selectedActivatedStyle).SetActivatedStyle(selectedActivatedStyle)
+			submitButton.SetStyle(disabledStyle).SetActivatedStyle(disabledStyle)
 		} else {
-			submitButton.SetStyle(defaultStyle).SetActivatedStyle(defaultStyle)
+			submitButton.SetStyle(defaultStyle).SetActivatedStyle(selectedStyle)
 		}
 		submitButton.SetLabel("Submit (s)")
 	}
@@ -226,21 +225,19 @@ func Run(app *tview.Application) error {
 	}
 
 	handleDeselect := func() {
-		setFocus(4, 3)
 		deselectButton.SetActivatedStyle(selectedStyle)
 		for cardContent := range gameState.selectedCards {
 			delete(gameState.selectedCards, cardContent)
 		}
 		for i := 0; i < 4; i++ {
 			for j := 0; j < 4; j++ {
-				buttons[i][j].SetStyle(defaultStyle)
+				buttons[i][j].SetStyle(defaultStyle).SetActivatedStyle(defaultStyle)
 			}
 		}
 		resetSubmitButton()
 	}
 
 	handleShuffle := func() {
-		setFocus(4, 0)
 		shuffleButton.SetActivatedStyle(selectedStyle)
 		// Flatten the buttons array for rows greater than currentMatchRow into a slice for shuffling
 		var flatButtons []*tview.Button
@@ -270,9 +267,7 @@ func Run(app *tview.Application) error {
 	}
 
 	handleSubmit := func() {
-		setFocus(4, 1)
 		if len(gameState.selectedCards) != 4 {
-			submitButton.SetStyle(selectedActivatedStyle).SetActivatedStyle(selectedActivatedStyle)
 			return
 		}
 
@@ -387,8 +382,8 @@ func Run(app *tview.Application) error {
 
 	submitButton = tview.NewButton("Submit (s)").
 		SetSelectedFunc(handleSubmit).
-		SetStyle(selectedActivatedStyle).
-		SetActivatedStyle(selectedActivatedStyle)
+		SetStyle(disabledStyle).
+		SetActivatedStyle(disabledStyle)
 
 	deselectButton = tview.NewButton("Deselect All (d)").
 		SetSelectedFunc(handleDeselect).
@@ -400,68 +395,50 @@ func Run(app *tview.Application) error {
 	grid.AddItem(deselectButton, 4, 3, 1, 1, 0, 0, false)
 
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		previousButton := findButton(focusedRow, focusedCol)
-		// TODO: This is currently duplicated with behavior in setFocus to support clicking.
-		if focusedRow < 4 {
-			previousButton.SetBorderColor(tcell.ColorDarkGray)
-		}
-		previousButton.SetActivatedStyle(defaultStyle)
-		if focusedRow < 4 && gameState.selectedCards[previousButton.GetLabel()] {
-			previousButton.SetStyle(selectedStyle)
-		} else if focusedRow == 4 {
-			previousButton.SetStyle(defaultStyle)
-		}
+		r := focusedRow
+		c := focusedCol
 
 		switch {
 		case event.Key() == tcell.KeyRune && event.Rune() == 'q':
 			app.Stop()
 		case event.Key() == tcell.KeyRune && event.Rune() == 'a':
-			r := focusedRow
-			c := focusedCol
 			handleShuffle()
-			setFocus(r, c)
 		case event.Key() == tcell.KeyRune && event.Rune() == 's':
-			r := focusedRow
-			c := focusedCol
 			handleSubmit()
 			if r < gameState.currentMatchRow {
 				r++
 			}
-			setFocus(r, c)
 		case event.Key() == tcell.KeyRune && event.Rune() == 'd':
-			r := focusedRow
-			c := focusedCol
 			handleDeselect()
-			setFocus(r, c)
 		case event.Key() == tcell.KeyUp, event.Key() == tcell.KeyRune && event.Rune() == 'k':
-			if focusedRow > gameState.currentMatchRow {
-				focusedRow--
+			if r > gameState.currentMatchRow {
+				r--
 			}
 			resetSubmitButton()
 		case event.Key() == tcell.KeyDown, event.Key() == tcell.KeyRune && event.Rune() == 'j':
-			if focusedRow < 4 {
-				focusedRow++
+			if r < 4 {
+				r++
 			}
 			resetSubmitButton()
 		case event.Key() == tcell.KeyLeft, event.Key() == tcell.KeyRune && event.Rune() == 'h':
-			if focusedCol > 0 {
-				if focusedRow == 4 && focusedCol == 2 {
-					focusedCol--
+			if c > 0 {
+				if r == 4 && c == 2 {
+					c--
 				}
-				focusedCol--
+				c--
 			}
 			resetSubmitButton()
 		case event.Key() == tcell.KeyRight, event.Key() == tcell.KeyRune && event.Rune() == 'l':
-			if focusedCol < 3 {
-				if focusedRow == 4 && focusedCol == 1 {
-					focusedCol++
+			if c < 3 {
+				if r == 4 && c == 1 {
+					c++
 				}
-				focusedCol++
+				c++
 			}
 			resetSubmitButton()
 		case event.Key() == tcell.KeyEnter, event.Key() == tcell.KeyRune && event.Rune() == ' ':
-			if focusedRow == 4 {
-				switch focusedCol {
+			if r == 4 {
+				switch c {
 				case 0:
 					handleShuffle()
 				case 3:
@@ -470,31 +447,21 @@ func Run(app *tview.Application) error {
 					handleSubmit()
 				}
 			} else {
-				label := buttons[focusedRow][focusedCol].GetLabel()
+				label := buttons[r][c].GetLabel()
 				if gameState.selectedCards[label] {
 					delete(gameState.selectedCards, label)
-					buttons[focusedRow][focusedCol].
-						SetStyle(defaultStyle)
+					buttons[r][c].SetStyle(defaultStyle).SetActivatedStyle(defaultStyle)
 				} else if len(gameState.selectedCards) < 4 {
 					gameState.selectedCards[label] = true
-					buttons[focusedRow][focusedCol].
-						SetStyle(selectedStyle).
-						SetActivatedStyle(selectedActivatedStyle)
+					buttons[r][c].SetStyle(selectedStyle).SetActivatedStyle(selectedStyle)
 				}
+				resetSubmitButton()
 			}
-			resetSubmitButton()
 		default:
 			return nil
 		}
 
-		button := findButton(focusedRow, focusedCol)
-		if focusedRow == 4 && (focusedCol == 0 || focusedCol == 3) {
-			button.SetActivatedStyle(selectedStyle)
-		}
-		if gameState.selectedCards[button.GetLabel()] {
-			button.SetActivatedStyle(selectedStyle)
-		}
-		setFocus(focusedRow, focusedCol)
+		setFocus(r, c)
 		return nil
 	})
 
