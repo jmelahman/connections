@@ -12,7 +12,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer screen.Fini()
 
 	app := tview.NewApplication()
 	if err := game.Run(app, screen); err != nil {
