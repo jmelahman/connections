@@ -207,13 +207,6 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 
 	handleClick := func(r, c int) func() {
 		return func() {
-			previousButton := findButton(focusedRow, focusedCol).
-				SetStyle(defaultStyle).
-				SetActivatedStyle(defaultStyle)
-			if focusedRow < 4 && gameState.selectedCards[previousButton.GetLabel()] {
-				previousButton.SetStyle(selectedStyle)
-			}
-
 			label := buttons[r][c].GetLabel()
 			if gameState.selectedCards[label] {
 				delete(gameState.selectedCards, label)
