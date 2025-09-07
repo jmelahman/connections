@@ -126,10 +126,10 @@ func parseConnectionsJSON(data []byte) (Response, error) {
 func RunWithScreen(screen tcell.Screen) error {
 	app := tview.NewApplication()
 	app.SetScreen(screen)
-	return Run(app)
+	return Run(app, screen)
 }
 
-func Run(app *tview.Application) error {
+func Run(app *tview.Application, screen tcell.Screen) error {
 	gameState := GameState{
 		selectedCards: make(map[string]bool),
 		categories:    make(map[string]Group),
@@ -156,9 +156,14 @@ func Run(app *tview.Application) error {
 	baseStyle := tcell.StyleDefault.
 		Background(tcell.ColorDefault).
 		Foreground(tcell.ColorBlack.TrueColor())
-	defaultStyle := baseStyle.Foreground(tcell.ColorDefault).Bold(true)
-	selectedStyle := baseStyle.Foreground(tcell.ColorGray).Bold(false)
-	disabledStyle := baseStyle.Foreground(tcell.ColorLightGray).Bold(false)
+	defaultStyle := baseStyle.Foreground(tcell.ColorDefault)
+	selectedStyle := baseStyle
+	if screen.Colors() < 256 {
+		selectedStyle = selectedStyle.Bold(true)
+	} else {
+		selectedStyle = selectedStyle.Foreground(tcell.ColorGray)
+	}
+	disabledStyle := baseStyle.Foreground(tcell.ColorDarkGray)
 
 	var shuffleButton, submitButton, deselectButton *tview.Button
 
