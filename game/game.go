@@ -227,8 +227,8 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		for cardContent := range gameState.selectedCards {
 			delete(gameState.selectedCards, cardContent)
 		}
-		for i := 0; i < 4; i++ {
-			for j := 0; j < 4; j++ {
+		for i := range 4 {
+			for j := range 4 {
 				buttons[i][j].SetStyle(defaultStyle).SetActivatedStyle(defaultStyle)
 			}
 		}
@@ -240,7 +240,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		// Flatten the buttons array for rows greater than currentMatchRow into a slice for shuffling
 		var flatButtons []*tview.Button
 		for i := gameState.currentMatchRow; i < 4; i++ {
-			for j := 0; j < 4; j++ {
+			for j := range 4 {
 				flatButtons = append(flatButtons, buttons[i][j])
 			}
 		}
@@ -253,7 +253,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		// Reassign the shuffled buttons back to the grid
 		index := 0
 		for i := gameState.currentMatchRow; i < 4; i++ {
-			for j := 0; j < 4; j++ {
+			for j := range 4 {
 				button := flatButtons[index].SetSelectedFunc(handleClick(i, j))
 				index++
 				grid.RemoveItem(button)
@@ -312,8 +312,8 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 			grid.AddItem(button, gameState.currentMatchRow, 0, 1, 4, 0, 0, false)
 
 			buttonsToMove := []*tview.Button{}
-			for i := 0; i < 4; i++ {
-				for j := 0; j < 4; j++ {
+			for i := range 4 {
+				for j := range 4 {
 					button := buttons[i][j]
 					wasSelected := gameState.selectedCards[button.GetLabel()]
 					if i == gameState.currentMatchRow && !wasSelected {
@@ -352,9 +352,9 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		}
 	}
 
-	for row := 0; row < 4; row++ {
+	for row := range 4 {
 		category := response.Categories[row]
-		for col := 0; col < 4; col++ {
+		for col := range 4 {
 			card := category.Cards[col]
 			label := cases.Title(language.AmericanEnglish).String(card.Content)
 			title := cases.Title(language.AmericanEnglish).String(category.Title)
