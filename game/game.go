@@ -153,17 +153,13 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	buttons := [4][4]*tview.Button{}
 	var focusedRow, focusedCol int
 
-	baseStyle := tcell.StyleDefault.
-		Background(tcell.ColorDefault).
-		Foreground(tcell.ColorBlack.TrueColor())
-	defaultStyle := baseStyle.Foreground(tcell.ColorDefault)
-	selectedStyle := baseStyle
+	var selectedStyle tcell.Style
 	if screen.Colors() < 256 {
 		selectedStyle = selectedStyle.Bold(true).Underline(true)
 	} else {
 		selectedStyle = selectedStyle.Foreground(tcell.ColorGray)
 	}
-	disabledStyle := baseStyle.Foreground(tcell.ColorDarkGray)
+	disabledStyle := tcell.StyleDefault.Foreground(tcell.ColorDarkGray).StrikeThrough(true)
 
 	var shuffleButton, submitButton, deselectButton *tview.Button
 
@@ -171,7 +167,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		if len(gameState.selectedCards) != 4 {
 			submitButton.SetStyle(disabledStyle).SetActivatedStyle(disabledStyle)
 		} else {
-			submitButton.SetStyle(defaultStyle).SetActivatedStyle(selectedStyle)
+			submitButton.SetStyle(tcell.StyleDefault).SetActivatedStyle(selectedStyle)
 		}
 		submitButton.SetLabel("Submit (s)")
 	}
@@ -210,7 +206,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 			label := buttons[r][c].GetLabel()
 			if gameState.selectedCards[label] {
 				delete(gameState.selectedCards, label)
-				buttons[r][c].SetStyle(defaultStyle).SetActivatedStyle(defaultStyle)
+				buttons[r][c].SetStyle(tcell.StyleDefault).SetActivatedStyle(tcell.StyleDefault)
 			} else if len(gameState.selectedCards) < 4 {
 				gameState.selectedCards[label] = true
 				buttons[r][c].SetStyle(selectedStyle).SetActivatedStyle(selectedStyle)
@@ -229,7 +225,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		}
 		for i := range 4 {
 			for j := range 4 {
-				buttons[i][j].SetStyle(defaultStyle).SetActivatedStyle(defaultStyle)
+				buttons[i][j].SetStyle(tcell.StyleDefault).SetActivatedStyle(tcell.StyleDefault)
 			}
 		}
 		resetSubmitButton()
@@ -301,13 +297,13 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 			button := tview.NewButton(contents).SetDisabled(true)
 			switch categoryIndex {
 			case 0:
-				button.SetDisabledStyle(baseStyle.Background(tcell.ColorYellow))
+				button.SetDisabledStyle(tcell.StyleDefault.Background(tcell.ColorYellow).Foreground(tcell.ColorBlack.TrueColor()))
 			case 1:
-				button.SetDisabledStyle(baseStyle.Background(tcell.ColorGreen))
+				button.SetDisabledStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor()))
 			case 2:
-				button.SetDisabledStyle(baseStyle.Background(tcell.ColorBlue))
+				button.SetDisabledStyle(tcell.StyleDefault.Background(tcell.ColorBlue).Foreground(tcell.ColorBlack.TrueColor()))
 			case 3:
-				button.SetDisabledStyle(baseStyle.Background(tcell.ColorPurple))
+				button.SetDisabledStyle(tcell.StyleDefault.Background(tcell.ColorPurple).Foreground(tcell.ColorBlack.TrueColor()))
 			}
 			grid.AddItem(button, gameState.currentMatchRow, 0, 1, 4, 0, 0, false)
 
@@ -338,17 +334,17 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 				delete(gameState.selectedCards, cardContent)
 			}
 			submitButton.
-				SetStyle(baseStyle.Background(tcell.ColorGreen)).
-				SetActivatedStyle(baseStyle.Background(tcell.ColorGreen))
+				SetStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor())).
+				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor()))
 		case offByOne:
 			submitButton.
-				SetStyle(baseStyle.Background(tcell.ColorYellow)).
-				SetActivatedStyle(baseStyle.Background(tcell.ColorYellow)).
+				SetStyle(tcell.StyleDefault.Background(tcell.ColorYellow).Foreground(tcell.ColorBlack.TrueColor())).
+				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorYellow).Foreground(tcell.ColorBlack.TrueColor())).
 				SetLabel("One away...")
 		default:
 			submitButton.
-				SetStyle(baseStyle.Background(tcell.ColorRed)).
-				SetActivatedStyle(baseStyle.Background(tcell.ColorRed))
+				SetStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor())).
+				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor()))
 		}
 	}
 
@@ -365,8 +361,8 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 
 			button := tview.NewButton(label).
 				SetSelectedFunc(handleClick(gRow, gCol)).
-				SetStyle(defaultStyle).
-				SetActivatedStyle(defaultStyle)
+				SetStyle(tcell.StyleDefault).
+				SetActivatedStyle(tcell.StyleDefault)
 			button.SetBorder(true).SetBorderColor(tcell.ColorDarkGray)
 			buttons[gRow][gCol] = button
 			grid.AddItem(button, gRow, gCol, 1, 1, 0, 0, false)
@@ -375,7 +371,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 
 	shuffleButton = tview.NewButton("Shuffle (a)").
 		SetSelectedFunc(handleShuffle).
-		SetStyle(defaultStyle).
+		SetStyle(tcell.StyleDefault).
 		SetActivatedStyle(selectedStyle)
 
 	submitButton = tview.NewButton("Submit (s)").
@@ -385,7 +381,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 
 	deselectButton = tview.NewButton("Deselect All (d)").
 		SetSelectedFunc(handleDeselect).
-		SetStyle(defaultStyle).
+		SetStyle(tcell.StyleDefault).
 		SetActivatedStyle(selectedStyle)
 
 	grid.AddItem(shuffleButton, 4, 0, 1, 1, 0, 0, false)
@@ -448,7 +444,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 				label := buttons[r][c].GetLabel()
 				if gameState.selectedCards[label] {
 					delete(gameState.selectedCards, label)
-					buttons[r][c].SetStyle(defaultStyle).SetActivatedStyle(defaultStyle)
+					buttons[r][c].SetStyle(tcell.StyleDefault).SetActivatedStyle(tcell.StyleDefault)
 				} else if len(gameState.selectedCards) < 4 {
 					gameState.selectedCards[label] = true
 					buttons[r][c].SetStyle(selectedStyle).SetActivatedStyle(selectedStyle)
