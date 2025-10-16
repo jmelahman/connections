@@ -159,7 +159,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	defaultStyle := baseStyle.Foreground(tcell.ColorDefault)
 	selectedStyle := baseStyle
 	if screen.Colors() < 256 {
-		selectedStyle = selectedStyle.Bold(true)
+		selectedStyle = selectedStyle.Bold(true).Underline(true)
 	} else {
 		selectedStyle = selectedStyle.Foreground(tcell.ColorGray)
 	}
