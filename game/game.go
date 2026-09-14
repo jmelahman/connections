@@ -10,7 +10,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -48,6 +50,9 @@ type GameState struct {
 	selectedCards   map[string]bool
 	categories      map[string]Group
 	currentMatchRow int
+	history         []string // One emoji row per submitted guess.
+	mistakes        int
+	wrongGuesses    map[string]bool // Distinct incorrect guesses, keyed by emoji row.
 }
 
 func fetch(urlString string) ([]byte, error) {
@@ -123,6 +128,28 @@ func parseConnectionsJSON(data []byte) (Response, error) {
 	return response, nil
 }
 
+// tileEmoji maps a category index to the emoji used in the share string.
+var tileEmoji = [4]string{"🟨", "🟩", "🟦", "🟪"}
+
+// copyToClipboard copies text using the platform's clipboard utility.
+func copyToClipboard(text string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "clip")
+	case "darwin":
+		cmd = exec.Command("pbcopy")
+	default:
+		if _, err := exec.LookPath("wl-copy"); err == nil {
+			cmd = exec.Command("wl-copy")
+		} else {
+			cmd = exec.Command("xclip", "-selection", "clipboard")
+		}
+	}
+	cmd.Stdin = strings.NewReader(text)
+	return cmd.Run()
+}
+
 func RunWithScreen(screen tcell.Screen) error {
 	app := tview.NewApplication()
 	app.SetScreen(screen)
@@ -133,6 +160,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	gameState := GameState{
 		selectedCards: make(map[string]bool),
 		categories:    make(map[string]Group),
+		wrongGuesses:  make(map[string]bool),
 	}
 
 	today := time.Now()
@@ -147,7 +175,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	}
 
 	grid := tview.NewGrid().
-		SetRows(3, 3, 3, 3, 3). // Added extra row for submit button
+		SetRows(3, 3, 3, 3, 3, 1). // Extra row for submit button, then mistakes counter.
 		SetColumns(20, 20, 20, 20)
 
 	buttons := [4][4]*tview.Button{}
@@ -161,7 +189,21 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	}
 	disabledStyle := tcell.StyleDefault.Foreground(tcell.ColorDarkGray).StrikeThrough(true)
 
-	var shuffleButton, submitButton, deselectButton *tview.Button
+	var shuffleButton, submitButton, deselectButton, shareButton *tview.Button
+
+	mistakesText := tview.NewTextView().
+		SetTextAlign(tview.AlignCenter).
+		SetText("Mistakes Remaining: ● ● ● ●")
+
+	gameOver := false
+
+	updateMistakes := func() {
+		if remaining := 4 - gameState.mistakes; remaining > 0 {
+			mistakesText.SetText(fmt.Sprintf("Mistakes Remaining: %s", strings.TrimRight(strings.Repeat("● ", remaining), " ")))
+		} else {
+			mistakesText.SetText(fmt.Sprintf("Mistakes: %d", gameState.mistakes))
+		}
+	}
 
 	resetSubmitButton := func() {
 		if len(gameState.selectedCards) != 4 {
@@ -174,6 +216,9 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 
 	findButton := func(r, c int) *tview.Button {
 		if r == 4 {
+			if gameOver {
+				return shareButton
+			}
 			switch c {
 			case 0:
 				return shuffleButton
@@ -277,10 +322,39 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		resetSubmitButton()
 	}
 
+	handleShare := func() {
+		var result strings.Builder
+		result.WriteString("Connections\n")
+		result.WriteString(fmt.Sprintf("Puzzle #%d\n", response.ID))
+		for _, row := range gameState.history {
+			result.WriteString(row)
+			result.WriteByte('\n')
+		}
+		if err := copyToClipboard(result.String()); err != nil {
+			shareButton.SetLabel(fmt.Sprintf("Copy failed: %v", err))
+			return
+		}
+		shareButton.SetLabel("Copied to clipboard!")
+	}
+
 	handleSubmit := func() {
 		if len(gameState.selectedCards) != 4 {
 			return
 		}
+
+		// Record the guess as a row of category emojis, ordered by category.
+		words := slices.Collect(maps.Keys(gameState.selectedCards))
+		slices.SortStableFunc(words, func(a, b string) int {
+			if ai, bi := gameState.categories[a].Index, gameState.categories[b].Index; ai != bi {
+				return ai - bi
+			}
+			return strings.Compare(a, b)
+		})
+		row := ""
+		for _, w := range words {
+			row += tileEmoji[gameState.categories[w].Index]
+		}
+		gameState.history = append(gameState.history, row)
 
 		var categoryTitle string
 		var categoryIndex int
@@ -350,15 +424,46 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 			for cardContent := range gameState.selectedCards {
 				delete(gameState.selectedCards, cardContent)
 			}
+
+			if gameState.currentMatchRow == 4 {
+				// Game over: swap the controls for a single share button.
+				gameOver = true
+				grid.RemoveItem(shuffleButton)
+				grid.RemoveItem(submitButton)
+				grid.RemoveItem(deselectButton)
+				grid.RemoveItem(mistakesText)
+				shareButton = tview.NewButton("Share Your Result").
+					SetSelectedFunc(handleShare).
+					SetStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor())).
+					SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor()))
+				grid.AddItem(shareButton, 4, 0, 1, 4, 0, 0, false)
+				focusedRow, focusedCol = 4, 0
+				app.SetFocus(shareButton)
+			}
+
 			submitButton.
 				SetStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor())).
 				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor()))
 		case offByOne:
+			if gameState.wrongGuesses[row] {
+				submitButton.SetLabel("Already Guessed")
+				break
+			}
+			gameState.wrongGuesses[row] = true
+			gameState.mistakes++
+			updateMistakes()
 			submitButton.
 				SetStyle(tcell.StyleDefault.Background(tcell.ColorYellow).Foreground(tcell.ColorBlack.TrueColor())).
 				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorYellow).Foreground(tcell.ColorBlack.TrueColor())).
 				SetLabel("One away...")
 		default:
+			if gameState.wrongGuesses[row] {
+				submitButton.SetLabel("Already Guessed")
+				break
+			}
+			gameState.wrongGuesses[row] = true
+			gameState.mistakes++
+			updateMistakes()
 			submitButton.
 				SetStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor())).
 				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor()))
@@ -404,6 +509,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	grid.AddItem(shuffleButton, 4, 0, 1, 1, 0, 0, false)
 	grid.AddItem(submitButton, 4, 1, 1, 2, 0, 0, false)
 	grid.AddItem(deselectButton, 4, 3, 1, 1, 0, 0, false)
+	grid.AddItem(mistakesText, 5, 0, 1, 4, 0, 0, false)
 
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		r := focusedRow
@@ -412,15 +518,15 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		switch {
 		case event.Key() == tcell.KeyRune && event.Rune() == 'q':
 			app.Stop()
-		case event.Key() == tcell.KeyRune && event.Rune() == 'a':
+		case event.Key() == tcell.KeyRune && event.Rune() == 'a' && !gameOver:
 			handleShuffle()
 			r, c = focusedRow, focusedCol
-		case event.Key() == tcell.KeyRune && event.Rune() == 's':
+		case event.Key() == tcell.KeyRune && event.Rune() == 's' && !gameOver:
 			handleSubmit()
 			if r < gameState.currentMatchRow {
 				r++
 			}
-		case event.Key() == tcell.KeyRune && event.Rune() == 'd':
+		case event.Key() == tcell.KeyRune && event.Rune() == 'd' && !gameOver:
 			handleDeselect()
 		case event.Key() == tcell.KeyUp, event.Key() == tcell.KeyRune && event.Rune() == 'k':
 			if r > gameState.currentMatchRow {
@@ -450,6 +556,10 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 			resetSubmitButton()
 		case event.Key() == tcell.KeyEnter, event.Key() == tcell.KeyRune && event.Rune() == ' ':
 			if r == 4 {
+				if gameOver {
+					handleShare()
+					break
+				}
 				switch c {
 				case 0:
 					handleShuffle()
