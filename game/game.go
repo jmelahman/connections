@@ -233,6 +233,11 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 
 	handleShuffle := func() {
 		shuffleButton.SetActivatedStyle(selectedStyle)
+		// Capture the focused button before the shuffle moves it to a new cell.
+		var focusedButton *tview.Button
+		if focusedRow < 4 {
+			focusedButton = findButton(focusedRow, focusedCol)
+		}
 		// Flatten the buttons array for rows greater than currentMatchRow into a slice for shuffling
 		var flatButtons []*tview.Button
 		for i := gameState.currentMatchRow; i < 4; i++ {
@@ -255,6 +260,18 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 				grid.RemoveItem(button)
 				grid.AddItem(button, i, j, 1, 1, 0, 0, false)
 				buttons[i][j] = button
+			}
+		}
+
+		// The focused word's button moved to a new cell with its focus border,
+		// so point the focus bookkeeping at its new position.
+		if focusedButton != nil {
+			for i := gameState.currentMatchRow; i < 4; i++ {
+				for j := range 4 {
+					if buttons[i][j] == focusedButton {
+						focusedRow, focusedCol = i, j
+					}
+				}
 			}
 		}
 		resetSubmitButton()
@@ -397,6 +414,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 			app.Stop()
 		case event.Key() == tcell.KeyRune && event.Rune() == 'a':
 			handleShuffle()
+			r, c = focusedRow, focusedCol
 		case event.Key() == tcell.KeyRune && event.Rune() == 's':
 			handleSubmit()
 			if r < gameState.currentMatchRow {
