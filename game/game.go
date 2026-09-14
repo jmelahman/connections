@@ -175,7 +175,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	}
 
 	grid := tview.NewGrid().
-		SetRows(3, 3, 3, 3, 3, 1). // Extra row for submit button, then mistakes counter.
+		SetRows(3, 3, 3, 3, 3). // Extra row for submit button.
 		SetColumns(20, 20, 20, 20)
 
 	buttons := [4][4]*tview.Button{}
@@ -190,6 +190,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	disabledStyle := tcell.StyleDefault.Foreground(tcell.ColorDarkGray).StrikeThrough(true)
 
 	var shuffleButton, submitButton, deselectButton, shareButton *tview.Button
+	var contentFlex *tview.Flex
 
 	mistakesText := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
@@ -432,7 +433,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 				grid.RemoveItem(shuffleButton)
 				grid.RemoveItem(submitButton)
 				grid.RemoveItem(deselectButton)
-				grid.RemoveItem(mistakesText)
+				contentFlex.RemoveItem(mistakesText)
 				shareButton = tview.NewButton("Share Your Result").
 					SetSelectedFunc(handleShare).
 					SetStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor())).
@@ -510,7 +511,6 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	grid.AddItem(shuffleButton, 4, 0, 1, 1, 0, 0, false)
 	grid.AddItem(submitButton, 4, 1, 1, 2, 0, 0, false)
 	grid.AddItem(deselectButton, 4, 3, 1, 1, 0, 0, false)
-	grid.AddItem(mistakesText, 5, 0, 1, 4, 0, 0, false)
 
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		r := focusedRow
@@ -601,14 +601,18 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		SetText(fmt.Sprintf("Connections - by %s\n%s", response.Editor, dateText))
 
 	// Create a flexbox to center the grid horizontally.
+	contentFlex = tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(tview.NewBox(), 0, 2, false). // Top spacer.
+		AddItem(headerText, 2, 1, false).     // Editor and print date.
+		AddItem(tview.NewBox(), 1, 1, false). // Gap between header and grid.
+		AddItem(grid, 0, 3, true).            // The grid, fixed width of 80.
+		AddItem(tview.NewBox(), 1, 1, false). // Gap between grid and mistakes counter.
+		AddItem(mistakesText, 1, 1, false).   // Mistakes counter.
+		AddItem(tview.NewBox(), 0, 1, false)  // Bottom spacer.
 	flex := tview.NewFlex().
 		AddItem(tview.NewBox(), 0, 1, false). // Left spacer.
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-							AddItem(tview.NewBox(), 0, 2, false).               // Top spacer (keeps the grid's old position).
-							AddItem(headerText, 2, 1, false).                    // Editor and print date.
-							AddItem(grid, 0, 3, true).                          // The grid, fixed width of 80.
-							AddItem(tview.NewBox(), 0, 1, false), 80, 1, true). // Bottom spacer.
-		AddItem(tview.NewBox(), 0, 1, false) // Right spacer.
+		AddItem(contentFlex, 80, 1, true).    // The centered game column.
+		AddItem(tview.NewBox(), 0, 1, false)  // Right spacer.
 
 	if err := app.SetRoot(flex, true).EnableMouse(true).Run(); err != nil {
 		return err
