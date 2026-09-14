@@ -604,9 +604,8 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	flex := tview.NewFlex().
 		AddItem(tview.NewBox(), 0, 1, false). // Left spacer.
 		AddItem(tview.NewFlex().SetDirection(tview.FlexRow).
-							AddItem(tview.NewBox(), 0, 1, false).               // Top spacer.
+							AddItem(tview.NewBox(), 0, 2, false).               // Top spacer (keeps the grid's old position).
 							AddItem(headerText, 2, 1, false).                    // Editor and print date.
-							AddItem(tview.NewBox(), 0, 1, false).               // Spacer below the header.
 							AddItem(grid, 0, 3, true).                          // The grid, fixed width of 80.
 							AddItem(tview.NewBox(), 0, 1, false), 80, 1, true). // Bottom spacer.
 		AddItem(tview.NewBox(), 0, 1, false) // Right spacer.
