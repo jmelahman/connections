@@ -173,6 +173,13 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		return err
 	}
 
+	// The Connections puzzle number is derived from the print date: puzzle #1
+	// was 2023-06-12. Used by the header and the share string.
+	puzzleNumber := response.ID
+	if date, err := time.Parse("2006-01-02", response.PrintDate); err == nil {
+		puzzleNumber = int(date.Sub(time.Date(2023, 6, 12, 0, 0, 0, 0, time.UTC)).Hours()/24) + 1
+	}
+
 	grid := tview.NewGrid().
 		SetRows(3, 3, 3, 3, 3). // Extra row for submit button.
 		SetColumns(20, 20, 20, 20)
@@ -325,8 +332,7 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	handleShare := func() {
 		var result strings.Builder
 		result.WriteString("Connections\n")
-		// would have been nice but the ID supplied doesnt seem to correspond to anything at all
-		// result.WriteString(fmt.Sprintf("Puzzle #%d\n", response.ID))
+		result.WriteString(fmt.Sprintf("Puzzle #%d\n", puzzleNumber))
 		for _, row := range gameState.history {
 			result.WriteString(row)
 			result.WriteByte('\n')
@@ -446,7 +452,10 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor()))
 		case offByOne:
 			if gameState.wrongGuesses[row] {
-				submitButton.SetLabel("Already Guessed")
+				submitButton.
+					SetStyle(tcell.StyleDefault.Background(tcell.ColorYellow).Foreground(tcell.ColorBlack.TrueColor())).
+					SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorYellow).Foreground(tcell.ColorBlack.TrueColor())).
+					SetLabel("One away...")
 				break
 			}
 			gameState.wrongGuesses[row] = true
@@ -458,15 +467,19 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 				SetLabel("One away...")
 		default:
 			if gameState.wrongGuesses[row] {
-				submitButton.SetLabel("Already Guessed")
-				break
+				submitButton.
+					SetStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor())).
+					SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor())).
+					SetLabel("Already Guessed")
+				break;
 			}
 			gameState.wrongGuesses[row] = true
 			gameState.mistakes++
 			updateMistakes()
 			submitButton.
 				SetStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor())).
-				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor()))
+				SetActivatedStyle(tcell.StyleDefault.Background(tcell.ColorRed).Foreground(tcell.ColorBlack.TrueColor())).
+				SetLabel("Incorrect")
 		}
 	}
 
@@ -588,15 +601,9 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 
 	setFocus(0, 0)
 
-	// Header above the grid: editor credit and the puzzle's print date.
-	printDate, err := time.Parse("2006-01-02", response.PrintDate)
-	dateText := response.PrintDate
-	if err == nil {
-		dateText = printDate.Format("January 2, 2006")
-	}
 	headerText := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
-		SetText(fmt.Sprintf("Connections - by %s\n%s", response.Editor, dateText))
+		SetText(fmt.Sprintf("Connections #%d\nBy %s", puzzleNumber, response.Editor))
 
 	// The game content needs 19 rows: header (2), gap (1), grid (15), and the
 	// mistakes counter (1). Extra terminal rows are split evenly above and
