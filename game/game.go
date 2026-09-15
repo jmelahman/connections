@@ -168,7 +168,6 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 	if err != nil {
 		return err
 	}
-
 	response, err := parseConnectionsJSON(connectionsData)
 	if err != nil {
 		return err
@@ -433,7 +432,6 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 				grid.RemoveItem(shuffleButton)
 				grid.RemoveItem(submitButton)
 				grid.RemoveItem(deselectButton)
-				contentFlex.RemoveItem(mistakesText)
 				shareButton = tview.NewButton("Share Your Result").
 					SetSelectedFunc(handleShare).
 					SetStyle(tcell.StyleDefault.Background(tcell.ColorGreen).Foreground(tcell.ColorBlack.TrueColor())).
@@ -600,15 +598,39 @@ func Run(app *tview.Application, screen tcell.Screen) error {
 		SetTextAlign(tview.AlignCenter).
 		SetText(fmt.Sprintf("Connections - by %s\n%s", response.Editor, dateText))
 
-	// Create a flexbox to center the grid horizontally.
-	contentFlex = tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(tview.NewBox(), 0, 2, false). // Top spacer.
-		AddItem(headerText, 2, 1, false).     // Editor and print date.
-		AddItem(tview.NewBox(), 1, 1, false). // Gap between header and grid.
-		AddItem(grid, 0, 3, true).            // The grid, fixed width of 80.
-		AddItem(tview.NewBox(), 1, 1, false). // Gap between grid and mistakes counter.
-		AddItem(mistakesText, 1, 1, false).   // Mistakes counter.
-		AddItem(tview.NewBox(), 0, 1, false)  // Bottom spacer.
+	// The game content needs 19 rows: header (2), gap (1), grid (15), and the
+	// mistakes counter (1). Extra terminal rows are split evenly above and
+	// below, with an odd row going to the top. All sizes are fixed (recomputed
+	// before each draw) so nothing drifts as the terminal is resized; only the
+	// grid is proportional, so it compresses gracefully below 19 rows.
+	contentFlex = tview.NewFlex().SetDirection(tview.FlexRow)
+	topSpacer, bottomSpacer := tview.NewBox(), tview.NewBox()
+	headerGap, footerGap := tview.NewBox(), tview.NewBox()
+	// Rebuild the content column for the given terminal height. Called before
+	// every draw (so resizing recenters the layout) and once up front: SetRoot
+	// cascades focus down through the column, which only reaches the grid if
+	// the items already exist.
+	relayout := func(height int) {
+		extra := max(height-19, 0)
+		footer := tview.Primitive(mistakesText)
+		if gameOver {
+			footer = footerGap // Keep the row count stable once the counter disappears.
+		}
+		contentFlex.Clear().
+			AddItem(topSpacer, extra/2+extra%2, 0, false).
+			AddItem(headerText, 2, 0, false).
+			AddItem(headerGap, 1, 0, false).
+			AddItem(grid, 0, 1, true).
+			AddItem(footer, 1, 0, false).
+			AddItem(bottomSpacer, extra/2, 0, false)
+	}
+	app.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
+		_, height := screen.Size()
+		relayout(height)
+		return false
+	})
+	_, termHeight := screen.Size()
+	relayout(termHeight)
 	flex := tview.NewFlex().
 		AddItem(tview.NewBox(), 0, 1, false). // Left spacer.
 		AddItem(contentFlex, 80, 1, true).    // The centered game column.
